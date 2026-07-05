@@ -1,0 +1,183 @@
+# litellm-proxy
+
+A small, team-usable LiteLLM gateway setup for local Claude Code workflows.
+
+This repo packages a local LiteLLM proxy with:
+
+- env-driven model routing in `config.yaml`
+- bootstrap and run scripts for a fresh clone
+- reusable virtual-key registration for Claude Code launchers
+- tmux launchers for OpenAI/Codex-style and Gemini-backed Claude Code sessions
+
+## What this repo is for
+
+Use this repo when you want a single local LiteLLM proxy that:
+
+- exposes a stable endpoint on `localhost:4000`
+- routes Claude Code requests to named upstream models
+- registers reusable virtual keys for different launcher profiles
+- gives teammates a reproducible setup without relying on one person's `~/Developer/...` layout
+
+## What this repo is not
+
+This is **local/dev infrastructure**, not stage/prod runtime infrastructure.
+
+It assumes:
+
+- you are running on your own machine
+- you can provide your own provider API keys
+- Redis is available locally on port `6379`
+- a Postgres database is available for `LITELLM_DATABASE_URL`
+
+## Files you should care about
+
+- `config.yaml` — canonical LiteLLM routing/config
+- `.env.example` — required environment variables
+- `setup-litellm-proxy.sh` — bootstrap dependencies, launch the proxy, register virtual keys
+- `start-litellm-proxy.sh` — start the proxy after setup
+- `start-tmux-litellm-codex.sh` — launch Claude Code against the OpenAI/Codex virtual key
+- `start-tmux-litellm-gemini.sh` — launch Claude Code against the Gemini virtual key
+
+## Prerequisites
+
+Install these locally first:
+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Redis on `localhost:6379`
+- Postgres reachable from your `LITELLM_DATABASE_URL`
+- `tmux`
+- `claude`
+- `lazygit`
+- `curl`
+- `nc` (netcat)
+
+## Quick start
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/luminarylane/litellm-proxy.git
+cd litellm-proxy
+```
+
+### 2. Create your local `.env`
+
+```bash
+cp .env.example .env
+```
+
+Fill in the values:
+
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `GEMINI_API_KEY_ALT`
+- `LITELLM_MASTER_KEY`
+- `LITELLM_DATABASE_URL`
+- `LITELLM_OPENAI_VIRTUAL_KEY`
+- `LITELLM_GEMINI_VIRTUAL_KEY`
+
+### 3. Bootstrap and register the launcher keys
+
+```bash
+./setup-litellm-proxy.sh
+```
+
+This script will:
+
+- load your `.env`
+- verify local prerequisites
+- create/sync `.venv` using `uv`
+- generate the Prisma client LiteLLM expects
+- start LiteLLM on port `4000`
+- register the OpenAI and Gemini virtual keys used by the included launchers
+- tail the proxy log so you can confirm startup
+
+### 4. Start the proxy later
+
+Once the environment already exists, you can run:
+
+```bash
+./start-litellm-proxy.sh
+```
+
+## Default local ports
+
+- LiteLLM proxy: `4000`
+- Redis: `6379`
+
+## Virtual-key profiles
+
+The setup script registers two virtual keys:
+
+- `LITELLM_OPENAI_VIRTUAL_KEY`
+- `LITELLM_GEMINI_VIRTUAL_KEY`
+
+Those map Claude Code model aliases to the configured upstream models in `config.yaml`.
+
+### OpenAI/Codex profile
+
+- `claude-opus-4-7` → `openai/gpt-5.5`
+- `claude-sonnet-4-6` → `openai/gpt-5.4`
+- `claude-haiku-4-6` → `openai/gpt-5.4-mini`
+
+### Gemini profile
+
+- `claude-opus-4-7` → `gemini/gemini-3.1-pro-preview`
+- `claude-sonnet-4-6` → `gemini/gemini-3.1-pro-preview`
+- `claude-haiku-4-6` → `gemini/gemini-3.5-flash`
+
+## Using the tmux launchers
+
+The included launchers are designed to be run from the repository you want Claude Code to operate in.
+
+For example, from your app repo:
+
+```bash
+cd ~/Developer/luminarylane2/repos/stream-4
+/path/to/litellm-proxy/start-tmux-litellm-codex.sh stream-4-openai
+```
+
+or:
+
+```bash
+cd ~/Developer/luminarylane2/repos/stream-4
+/path/to/litellm-proxy/start-tmux-litellm-gemini.sh stream-4-gemini
+```
+
+The launchers expect:
+
+- `.mcp.json` exists in the current working directory
+- the LiteLLM proxy is already running on `localhost:4000`
+- the virtual keys from your `.env` are available
+
+If you want a non-default proxy endpoint, set:
+
+- `LITELLM_BASE_URL_OVERRIDE`
+
+before launching.
+
+## Validation
+
+Basic shell validation for the shipped scripts:
+
+```bash
+bash -n setup-litellm-proxy.sh
+bash -n start-litellm-proxy.sh
+bash -n start-tmux-litellm-codex.sh
+bash -n start-tmux-litellm-gemini.sh
+```
+
+## Open-source boundary
+
+This repo intentionally does **not** include:
+
+- real `.env` files
+- provider API keys
+- personal machine paths
+- local virtualenv state
+- local logs
+- non-LiteLLM launcher experiments with embedded secrets
+
+## License
+
+MIT

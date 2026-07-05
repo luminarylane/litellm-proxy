@@ -1,0 +1,89 @@
+model_list:
+  # --- OPENAI TIERS ---
+  - model_name: openai/gpt-5.5
+    litellm_params:
+      model: openai/gpt-5.5
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  - model_name: openai/gpt-5.4
+    litellm_params:
+      model: openai/gpt-5.4
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  - model_name: openai/gpt-5.4-mini
+    litellm_params:
+      model: openai/gpt-5.4-mini
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  # --- PRIMARY PRO TIERS (Pooled to shuffle across your keys when Pro is called) ---
+  - model_name: gemini/gemini-3.1-pro-preview
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: gemini/gemini-3.1-pro-preview
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_key: "os.environ/GEMINI_API_KEY_ALT"
+
+  # --- PRIMARY FLASH TIERS (Pooled to shuffle when Haiku tasks call Flash) ---
+  - model_name: gemini/gemini-3.5-flash
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: gemini/gemini-3.5-flash
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: "os.environ/GEMINI_API_KEY_ALT"
+
+  # --- BACKUP GEMINI TIERS (Your stable safety nets) ---
+  - model_name: gemini/gemini-3.1-flash-lite
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: gemini/gemini-2.5-flash-lite
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: "os.environ/GEMINI_API_KEY"
+
+router_settings:
+  num_retries: 2
+  timeout: 45 # Gives the heavy Pro context enough time to compile
+  routing_strategy: simple-shuffle # Smoothly splits your Pro load 50/50 and your Flash load 50/50
+  allowed_fails: 3
+  cooldown_time: 30
+
+  # --- THE NATIVE LITERAL FALLBACK MATRICES ---
+  fallbacks:
+    - gemini/gemini-3.1-pro-preview:
+        ["gemini/gemini-3.1-flash-lite", "gemini/gemini-2.5-flash-lite"]
+    - gemini/gemini-3.5-flash:
+        ["gemini/gemini-3.1-flash-lite", "gemini/gemini-2.5-flash-lite"]
+    - openai/gpt-5.5: ["openai/gpt-5.4-mini"]
+    - openai/gpt-5.4: ["openai/gpt-5.4-mini"]
+
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  database_url: "os.environ/LITELLM_DATABASE_URL"
+  database_connection_pool_limit: 3
+  database_connection_timeout: 30
+  # --- SILENCE THE TOKEN COUNTING WARNINGS ---
+  # Forces LiteLLM to use local tiktoken rules instantly.
+  # This completely eliminates the microsecond network connection glitches.
+  tokenize: true
+
+  # --- PREVENT OPENAI TOOL POLLING ERRORS ---
+  # Forces the proxy server to handle ALL counting checks on your local machine.
+  # This completely stops the proxy from passing incomplete tool schemas to OpenAI's endpoints.
+  local_tokenizer_only: true
+
+litellm_settings:
+  max_retries: 2
+  cache: true
+  cache_type: "redis"
+  enable_redis_auth_cache: true
+  request_timeout: 45
+  max_tokens: 4096
+  turn_off_message_logging: true
