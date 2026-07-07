@@ -176,14 +176,15 @@ If you want a non-default proxy endpoint, set:
 
 before launching.
 
-## Optional: token and cost optimization
+## Optional: DX and cost optimizations
 
-If you are running this against paid upstream APIs, you may want to stack a couple of open-source tools that reduce token burn without changing the proxy config:
+A few open-source add-ons that improve the Claude Code experience when using this proxy:
 
 - **[lean-ctx](https://github.com/yvgude/lean-ctx)** — a context runtime that sits between Claude Code and the filesystem. It compresses repeated file reads with AST-aware logic, strips noise from shell output, and manages cross-session memory.
 - **[caveman](https://github.com/JuliusBrussee/caveman)** — a Claude Code plugin that trims verbose model output. Reports suggest it can cut output tokens by roughly 65–75% by keeping replies short and direct.
+- **[tweakcc](https://github.com/Piebald-AI/tweakcc)** — customize Claude Code's look and feel: themes, thinking verbs, spinners, input styling, system prompts, custom toolsets, and more.
 
-Neither is required to use this proxy, but either can lower your API bill on long sessions.
+None of these are required to use the proxy, but they can make long sessions cheaper, faster, or more pleasant.
 
 ## Validation
 
