@@ -33,10 +33,12 @@ It assumes:
 
 - `config.yaml` — canonical LiteLLM routing/config
 - `.env.example` — required environment variables
-- `setup-litellm-proxy.sh` — bootstrap dependencies, launch the proxy, register virtual keys
-- `start-litellm-proxy.sh` — start the proxy after setup
-- `start-tmux-litellm-codex.sh` — launch Claude Code against the OpenAI/Codex virtual key
-- `start-tmux-litellm-gemini.sh` — launch Claude Code against the Gemini virtual key
+- `setup.sh` — bootstrap dependencies, launch the proxy, register virtual keys
+- `run.sh` — start the proxy after setup
+- `start-litellm-codex.sh` — launch Claude Code against the OpenAI/Codex virtual key
+- `start-litellm-gemini.sh` — launch Claude Code against the Gemini virtual key
+- `start-litellm-codex-in-tmux.sh` — launch Claude Code + lazygit in a tmux session (OpenAI/Codex)
+- `start-litellm-gemini-in-tmux.sh` — launch Claude Code + lazygit in a tmux session (Gemini)
 
 ## Prerequisites
 
@@ -79,7 +81,7 @@ Fill in the values:
 ### 3. Bootstrap and register the launcher keys
 
 ```bash
-./setup-litellm-proxy.sh
+./setup.sh
 ```
 
 This script will:
@@ -97,7 +99,7 @@ This script will:
 Once the environment already exists, you can run:
 
 ```bash
-./start-litellm-proxy.sh
+./run.sh
 ```
 
 ## Default local ports
@@ -134,14 +136,14 @@ For example, from your app repo:
 
 ```bash
 cd ~/Developer/luminarylane2/repos/stream-4
-/path/to/litellm-proxy/start-tmux-litellm-codex.sh stream-4-openai
+/path/to/litellm-proxy/start-litellm-codex-in-tmux.sh stream-4-openai
 ```
 
 or:
 
 ```bash
 cd ~/Developer/luminarylane2/repos/stream-4
-/path/to/litellm-proxy/start-tmux-litellm-gemini.sh stream-4-gemini
+/path/to/litellm-proxy/start-litellm-gemini-in-tmux.sh stream-4-gemini
 ```
 
 The launchers expect:
@@ -161,10 +163,12 @@ before launching.
 Basic shell validation for the shipped scripts:
 
 ```bash
-bash -n setup-litellm-proxy.sh
-bash -n start-litellm-proxy.sh
-bash -n start-tmux-litellm-codex.sh
-bash -n start-tmux-litellm-gemini.sh
+bash -n setup.sh
+bash -n run.sh
+bash -n start-litellm-codex.sh
+bash -n start-litellm-gemini.sh
+bash -n start-litellm-codex-in-tmux.sh
+bash -n start-litellm-gemini-in-tmux.sh
 ```
 
 ## Open-source boundary

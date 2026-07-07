@@ -7,8 +7,4 @@ __pycache__/
 *.pyo
 *.log
 .DS_Store
-
-# Local-only launcher experiments with provider-specific secrets.
-start-tmux-kimi.sh
-start-tmux-claude-kimi.sh
-start-tmux-claude-glm.sh
+.kimi-code/
