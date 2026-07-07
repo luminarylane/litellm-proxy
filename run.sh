@@ -78,4 +78,4 @@ fi
 echo "✅ Port $LITELLM_PORT is available."
 
 echo "🚀 Starting LiteLLM proxy on port $LITELLM_PORT..."
-uv run litellm --config config.yaml --port "$LITELLM_PORT" --use_v2_migration_resolver --num_workers 4 --telemetry False
+uv run litellm --config config.yaml --port "$LITELLM_PORT" --use_v2_migration_resolver --num_workers 1 --telemetry False

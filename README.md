@@ -78,7 +78,7 @@ Fill in the values:
 - `LITELLM_OPENAI_VIRTUAL_KEY`
 - `LITELLM_GEMINI_VIRTUAL_KEY`
 
-> **Supabase Postgres note:** A Supabase free-tier database works fine for `LITELLM_DATABASE_URL`, but use the **IPv4 pooled connection string** (`...supabase.com:6543/postgres`). The direct connection hostname is not IPv4 compatible and will fail from most local networks ([details](https://github.com/orgs/supabase/discussions/33534#discussioncomment-12234453)).
+> **Supabase Postgres note:** A Supabase free-tier database works fine for `LITELLM_DATABASE_URL`, but it enforces a small connection cap (commonly 15 in session mode). If you share one DB across multiple local proxies, keep each proxy small: this repo defaults to `--num_workers 1`, `database_connection_pool_limit: 1`, and `?connection_limit=1` on the URL. Upgrading to a paid plan is required for the IPv4 transaction pooler that removes the cap.
 
 ### 3. Bootstrap and register the launcher keys
 

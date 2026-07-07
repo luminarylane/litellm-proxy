@@ -67,8 +67,8 @@ router_settings:
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
   database_url: "os.environ/LITELLM_DATABASE_URL"
-  database_connection_pool_limit: 3
-  database_connection_timeout: 30
+  database_connection_pool_limit: 1
+  database_connection_timeout: 10
   # --- SILENCE THE TOKEN COUNTING WARNINGS ---
   # Forces LiteLLM to use local tiktoken rules instantly.
   # This completely eliminates the microsecond network connection glitches.
