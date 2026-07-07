@@ -180,7 +180,7 @@ before launching.
 
 If you are running this against paid upstream APIs, you may want to stack a couple of open-source tools that reduce token burn without changing the proxy config:
 
-- **[lean-ctx](https://leanctx.com)** — a context runtime that sits between Claude Code and the filesystem. It compresses repeated file reads with AST-aware logic, strips noise from shell output, and manages cross-session memory.
+- **[lean-ctx](https://github.com/yvgude/lean-ctx)** — a context runtime that sits between Claude Code and the filesystem. It compresses repeated file reads with AST-aware logic, strips noise from shell output, and manages cross-session memory.
 - **[caveman](https://github.com/JuliusBrussee/caveman)** — a Claude Code plugin that trims verbose model output. Reports suggest it can cut output tokens by roughly 65–75% by keeping replies short and direct.
 
 Neither is required to use this proxy, but either can lower your API bill on long sessions.
