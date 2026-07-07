@@ -27,7 +27,7 @@ It assumes:
 - you are running on your own machine
 - you can provide your own provider API keys
 - Redis is available locally on port `6379`
-- a Postgres database is available for `LITELLM_DATABASE_URL`
+- a Postgres database is available for `LITELLM_DATABASE_URL` (a free-tier Supabase Postgres works; see note below)
 
 ## Files you should care about
 
@@ -77,6 +77,8 @@ Fill in the values:
 - `LITELLM_DATABASE_URL`
 - `LITELLM_OPENAI_VIRTUAL_KEY`
 - `LITELLM_GEMINI_VIRTUAL_KEY`
+
+> **Supabase Postgres note:** A Supabase free-tier database works fine for `LITELLM_DATABASE_URL`, but use the **IPv4 pooled connection string** (`...supabase.com:6543/postgres`). The direct IPv6 connection will fail from most local networks.
 
 ### 3. Bootstrap and register the launcher keys
 
