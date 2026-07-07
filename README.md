@@ -78,7 +78,7 @@ Fill in the values:
 - `LITELLM_OPENAI_VIRTUAL_KEY`
 - `LITELLM_GEMINI_VIRTUAL_KEY`
 
-> **Supabase Postgres note:** A Supabase free-tier database works fine for `LITELLM_DATABASE_URL`, but use the **IPv4 pooled connection string** (`...supabase.com:6543/postgres`). The direct IPv6 connection will fail from most local networks.
+> **Supabase Postgres note:** A Supabase free-tier database works fine for `LITELLM_DATABASE_URL`, but use the **IPv4 pooled connection string** (`...supabase.com:6543/postgres`). The direct connection hostname is not IPv4 compatible and will fail from most local networks ([details](https://github.com/orgs/supabase/discussions/33534#discussioncomment-12234453)).
 
 ### 3. Bootstrap and register the launcher keys
 
