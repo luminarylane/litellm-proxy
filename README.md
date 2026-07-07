@@ -109,6 +109,16 @@ Once the environment already exists, you can run:
 - LiteLLM proxy: `4000`
 - Redis: `6379`
 
+## LiteLLM proxy UI
+
+LiteLLM exposes a built-in admin UI at:
+
+```
+http://localhost:4000/ui
+```
+
+Log in with `LITELLM_MASTER_KEY` as the password. From there you can inspect registered virtual keys, track spend, view request logs, and manage model routing without touching `config.yaml` directly.
+
 ## Virtual-key profiles
 
 The setup script registers two virtual keys:
