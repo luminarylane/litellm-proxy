@@ -117,7 +117,11 @@ LiteLLM exposes a built-in admin UI at:
 http://localhost:4000/ui
 ```
 
-Log in with `LITELLM_MASTER_KEY` as the password. From there you can inspect registered virtual keys, track spend, view request logs, and manage model routing without touching `config.yaml` directly.
+Log in with `LITELLM_MASTER_KEY` as the password (default username is `admin`).
+
+You can override the UI credentials by setting `UI_USERNAME` and `UI_PASSWORD` in your `.env` before starting the proxy.
+
+From there you can inspect registered virtual keys, track spend, view request logs, and manage model routing without touching `config.yaml` directly.
 
 ## Virtual-key profiles
 
