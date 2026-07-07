@@ -121,6 +121,8 @@ Log in with `LITELLM_MASTER_KEY` as the password (default username is `admin`).
 
 You can override the UI credentials by setting `UI_USERNAME` and `UI_PASSWORD` in your `.env` before starting the proxy.
 
+> This password is only for the `/ui` admin interface. Claude Code requests still authenticate with the virtual keys (`LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_GEMINI_VIRTUAL_KEY`).
+
 From there you can inspect registered virtual keys, track spend, view request logs, and manage model routing without touching `config.yaml` directly.
 
 ## Virtual-key profiles
