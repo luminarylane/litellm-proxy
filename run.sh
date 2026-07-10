@@ -1,81 +1,65 @@
 #!/bin/bash
 set -euo pipefail
 
-LITELLM_PORT="${LITELLM_PORT:-4000}"
-REDIS_PORT="${REDIS_PORT:-6379}"
+REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ ! -f ".env" ]; then
-    echo "❌ .env file is missing in current directory. Cannot start LiteLLM proxy." >&2
-    echo "Copy .env.example to .env and fill in the required values first." >&2
-    exit 1
-fi
-echo "✅ .env file found. Loading variables..."
+usage() {
+  cat <<'EOF'
+Usage: ./run.sh [docker|local]
 
-# shellcheck disable=SC1091
-set -a
-source .env
-set +a
+  docker  Start the self-contained LiteLLM, Postgres, and Redis Docker Compose stack.
+  local   Start the host-managed LiteLLM runtime from ./local/run.sh.
 
-required_vars=(
-  OPENAI_API_KEY
-  GEMINI_API_KEY
-  GEMINI_API_KEY_ALT
-  LITELLM_MASTER_KEY
-  LITELLM_DATABASE_URL
-)
-for var_name in "${required_vars[@]}"; do
-  if [ -z "${!var_name:-}" ]; then
-    echo "❌ Required environment variable '$var_name' is missing from .env" >&2
+Without an argument, choose the deployment mode interactively.
+EOF
+}
+
+start_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "❌ Docker with the Compose plugin is required for Docker mode." >&2
     exit 1
   fi
-done
-echo "✅ Required environment variables loaded."
 
-if ! command -v uv &> /dev/null; then
-    echo "❌ uv is not installed." >&2
-    echo "Please install uv: https://docs.astral.sh/uv/getting-started/installation/" >&2
+  if [[ ! -f "$REPO_DIR/.env" ]]; then
+    echo "❌ .env is missing. Copy .env.example to .env and set the required secrets first." >&2
     exit 1
-fi
-echo "✅ uv is installed."
+  fi
 
-if [ ! -d ".venv" ]; then
-    echo "❌ .venv is missing. Please run ./setup.sh first." >&2
+  exec docker compose --project-directory "$REPO_DIR" up --detach
+}
+
+start_local() {
+  exec "$REPO_DIR/local/run.sh"
+}
+
+case "${1:-}" in
+  docker)
+    start_docker
+    ;;
+  local)
+    start_local
+    ;;
+  "")
+    printf 'Choose LiteLLM deployment mode:\n'
+    printf '  1) Docker Compose (recommended; LiteLLM + Postgres + Redis)\n'
+    printf '  2) Local host runtime (requires externally managed Redis + Postgres)\n'
+    read -r -p 'Enter choice [1-2]: ' choice
+
+    case "$choice" in
+      1) start_docker ;;
+      2) start_local ;;
+      *)
+        echo "❌ Invalid choice. Run ./run.sh docker or ./run.sh local." >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    echo "❌ Unknown deployment mode: $1" >&2
+    usage >&2
     exit 1
-fi
-echo "✅ Virtual environment exists."
-
-if ! uv run python -c "import litellm" >/dev/null 2>&1; then
-    echo "❌ LiteLLM is not installed in the local virtual environment." >&2
-    echo "Please run ./setup.sh first." >&2
-    exit 1
-fi
-echo "✅ LiteLLM is installed."
-
-if [ ! -f "config.yaml" ]; then
-    echo "❌ config.yaml file is missing. Cannot start LiteLLM proxy." >&2
-    exit 1
-fi
-echo "✅ config.yaml found."
-
-if ! command -v nc &> /dev/null; then
-    echo "❌ netcat (nc) is not installed." >&2
-    exit 1
-fi
-echo "✅ netcat is installed."
-
-if ! echo "PING" | nc -w 2 "localhost" "$REDIS_PORT" 2>/dev/null | grep -q "PONG"; then
-    echo "❌ Redis is down or unreachable on port $REDIS_PORT!" >&2
-    echo "Please start Redis on localhost and try again." >&2
-    exit 1
-fi
-echo "✅ Redis is active on port $REDIS_PORT."
-
-if nc -z localhost "$LITELLM_PORT"; then
-  echo "❌ LiteLLM proxy is already running and listening on port $LITELLM_PORT." >&2
-  echo "Stop the running proxy and try again." >&2
-  exit 1
-fi
-echo "✅ Port $LITELLM_PORT is available."
-
-echo "🚀 Starting LiteLLM proxy on port $LITELLM_PORT..."
-uv run litellm --config config.yaml --port "$LITELLM_PORT" --use_v2_migration_resolver --num_workers 1 --telemetry False
+    ;;
+esac

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_DIR"
+
 LITELLM_PORT="${LITELLM_PORT:-4000}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 PROXY_LOG="litellm_proxy.log"
@@ -22,6 +25,7 @@ required_vars=(
   GEMINI_API_KEY
   GEMINI_API_KEY_ALT
   LITELLM_MASTER_KEY
+  LITELLM_SALT_KEY
   LITELLM_DATABASE_URL
   LITELLM_OPENAI_VIRTUAL_KEY
   LITELLM_OPENAI_5_6_VIRTUAL_KEY
@@ -95,7 +99,7 @@ trap "kill $LITELLM_PID 2>/dev/null || true" EXIT
 echo "⏳ Waiting for LiteLLM healthcheck..."
 TIMEOUT=30
 ELAPSED=0
-while ! curl -s "http://localhost:${LITELLM_PORT}/health" &> /dev/null; do
+while ! curl -s --header "Authorization: Bearer ${LITELLM_MASTER_KEY}" "http://localhost:${LITELLM_PORT}/health" &> /dev/null; do
     sleep 1
     ELAPSED=$((ELAPSED + 1))
 
@@ -113,65 +117,7 @@ done
 
 echo "✅ Proxy is healthy and running on port $LITELLM_PORT!"
 echo "🔄 Registering reusable virtual-key aliases for the included launchers..."
-
-# --- REGISTER THE OPENAI 5.6 FAMILU VIRTUAL PROFILE ---
-HTTP_CODE_OPENAI=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:${LITELLM_PORT}/key/generate" \
-     -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-     -H "Content-Type: application/json" \
-     -d "{
-       \"key\": \"$LITELLM_OPENAI_5_6_VIRTUAL_KEY\",
-       \"aliases\": {
-         \"claude-opus-4-7\": \"openai/gpt-5.6-sol\",
-         \"claude-sonnet-4-6\": \"openai/gpt-5.6-terra\",
-         \"claude-haiku-4-6\": \"openai/gpt-5.6-luna\"
-       }
-     }")
-
-if [ "$HTTP_CODE_OPENAI" -eq 200 ] || [ "$HTTP_CODE_OPENAI" -eq 201 ]; then
-    echo "✅ OpenAI 5.6 profile alias mapped to: $LITELLM_OPENAI_5_6_VIRTUAL_KEY"
-else
-    echo "❌ OpenAI key registration failed with HTTP status: $HTTP_CODE_OPENAI" >&2
-fi
-
-# --- REGISTER THE OPENAI VIRTUAL PROFILE ---
-HTTP_CODE_OPENAI=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:${LITELLM_PORT}/key/generate" \
-     -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-     -H "Content-Type: application/json" \
-     -d "{
-       \"key\": \"$LITELLM_OPENAI_VIRTUAL_KEY\",
-       \"aliases\": {
-         \"claude-opus-4-7\": \"openai/gpt-5.5\",
-         \"claude-sonnet-4-6\": \"openai/gpt-5.4\",
-         \"claude-haiku-4-6\": \"openai/gpt-5.4-mini\"
-       }
-     }")
-
-if [ "$HTTP_CODE_OPENAI" -eq 200 ] || [ "$HTTP_CODE_OPENAI" -eq 201 ]; then
-    echo "✅ OpenAI profile alias mapped to: $LITELLM_OPENAI_VIRTUAL_KEY"
-else
-    echo "❌ OpenAI key registration failed with HTTP status: $HTTP_CODE_OPENAI" >&2
-fi
-
-# --- REGISTER THE GEMINI VIRTUAL PROFILE ---
-HTTP_CODE_GEMINI=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:${LITELLM_PORT}/key/generate" \
-     -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-     -H "Content-Type: application/json" \
-     -d "{
-       \"key\": \"$LITELLM_GEMINI_VIRTUAL_KEY\",
-       \"aliases\": {
-         \"claude-opus-4-7\": \"gemini/gemini-3.1-pro-preview\",
-         \"claude-sonnet-4-6\": \"gemini/gemini-3.1-pro-preview\",
-         \"claude-haiku-4-6\": \"gemini/gemini-3.5-flash\"
-       }
-     }")
-
-if [ "$HTTP_CODE_GEMINI" -eq 200 ] || [ "$HTTP_CODE_GEMINI" -eq 201 ]; then
-    echo "✅ Gemini profile alias mapped to: $LITELLM_GEMINI_VIRTUAL_KEY"
-else
-    echo "❌ Gemini key registration failed with HTTP status: $HTTP_CODE_GEMINI" >&2
-fi
-
-echo "🎉 Key registration completed successfully!"
+LITELLM_URL="http://127.0.0.1:${LITELLM_PORT}" "$REPO_DIR/register-keys.sh"
 
 trap - EXIT
 

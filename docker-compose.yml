@@ -1,0 +1,83 @@
+services:
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:v1.91.1
+    env_file: .env
+    environment:
+      LITELLM_DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/litellm?connection_limit=1&pool_timeout=10
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?Set LITELLM_SALT_KEY in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    command:
+      - --config
+      - /app/config.yaml
+      - --port
+      - "4000"
+      - --use_v2_migration_resolver
+      - --num_workers
+      - "1"
+      - --telemetry
+      - "False"
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3 -c ''import urllib.request; req = urllib.request.Request("http://127.0.0.1:4000/health", headers={"Authorization": "Bearer $LITELLM_MASTER_KEY"}); urllib.request.urlopen(req)''',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  register-keys:
+    image: curlimages/curl:8.12.1
+    env_file: .env
+    environment:
+      LITELLM_URL: http://litellm:4000
+    volumes:
+      - ./register-keys.sh:/register-keys.sh:ro
+    entrypoint: ["/bin/sh", "/register-keys.sh"]
+    depends_on:
+      litellm:
+        condition: service_healthy
+    restart: "no"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

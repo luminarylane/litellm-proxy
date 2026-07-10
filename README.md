@@ -7,6 +7,7 @@ This repo packages a local LiteLLM proxy with:
 - env-driven model routing in `config.yaml`
 - bootstrap and run scripts for a fresh clone
 - reusable virtual-key registration for Claude Code launchers
+- a Docker Compose stack that bundles LiteLLM, Postgres, and Redis
 - tmux launchers for OpenAI/Codex-style and Gemini-backed Claude Code sessions
 
 ## What this repo is for
@@ -24,34 +25,28 @@ This is **local/dev infrastructure**, not stage/prod runtime infrastructure.
 
 It assumes:
 
-- you are running on your own machine
+- you are running on your own machine or an organization-managed Docker host
 - you can provide your own provider API keys
-- Redis is available locally on port `6379`
-- a Postgres database is available for `LITELLM_DATABASE_URL` (a free-tier Supabase Postgres works; see note below)
+- Docker Compose for the self-contained default, or local Redis/Postgres for the legacy host-run scripts
+- network access only to the model providers you configure
 
 ## Files you should care about
 
 - `config.yaml` — canonical LiteLLM routing/config
-- `.env.example` — required environment variables
-- `setup.sh` — bootstrap dependencies, launch the proxy, register virtual keys
-- `run.sh` — start the proxy after setup
-- `update.sh` — refresh the proxy libraries and re-register the OpenAI 5.6 virtual-key aliases
-- `scripts/` — relocatable Claude Code launchers to copy into a target repository
+- `.env.example` — required environment variables and Docker Compose secrets
+- `run.sh` — root dispatcher: select Docker Compose or local host mode
+- `docker-compose.yml` — self-contained stack using LiteLLM's official proxy image, Postgres, and Redis
+- `register-keys.sh` — shared virtual-key registration used by Compose and `local/`
+- `local/` — host-managed runtime scripts (`setup.sh`, `run.sh`, and `update.sh`)
+- `claude/` — relocatable Claude Code launchers to copy into a target repository
 
 ## Prerequisites
 
-Install these locally first:
+For the recommended self-contained setup, install [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine with the Compose plugin. The host needs `tmux`, `claude`, `lazygit`, `curl`, and `nc` only when using the optional Claude Code launchers.
 
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- Redis on `localhost:6379`
-- Postgres reachable from your `LITELLM_DATABASE_URL`
-- `tmux`
-- `claude`
-- `lazygit`
-- `curl`
-- `nc` (netcat)
+The legacy host-run scripts additionally require [uv](https://docs.astral.sh/uv/getting-started/installation/), Redis on `localhost:6379`, and Postgres reachable from `LITELLM_DATABASE_URL`.
 
-## Quick start
+## Quick start: self-contained Docker Compose stack
 
 ### 1. Clone the repo
 
@@ -60,48 +55,65 @@ git clone https://github.com/luminarylane/litellm-proxy.git
 cd litellm-proxy
 ```
 
-### 2. Create your local `.env`
+### 2. Create your organization `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the values:
+Set at least:
 
-- `OPENAI_API_KEY`
-- `GEMINI_API_KEY`
-- `GEMINI_API_KEY_ALT`
-- `LITELLM_MASTER_KEY`
-- `LITELLM_DATABASE_URL`
-- `LITELLM_OPENAI_VIRTUAL_KEY`
-- `LITELLM_OPENAI_5_6_VIRTUAL_KEY`
-- `LITELLM_GEMINI_VIRTUAL_KEY`
+- `OPENAI_API_KEY` and/or `GEMINI_API_KEY` (the configured provider credentials)
+- `LITELLM_MASTER_KEY` (strong administrator secret)
+- `LITELLM_SALT_KEY` (strong stable secret; do not rotate after LiteLLM stores credentials)
+- `POSTGRES_PASSWORD` (strong password for the bundled Postgres database)
+- `LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_OPENAI_5_6_VIRTUAL_KEY`, and `LITELLM_GEMINI_VIRTUAL_KEY`
 
-> **Supabase Postgres note:** A Supabase free-tier database works fine for `LITELLM_DATABASE_URL`, but it enforces a small connection cap (commonly 15 in session mode). If you share one DB across multiple local proxies, keep each proxy small: this repo defaults to `--num_workers 1`, `database_connection_pool_limit: 1`, and `?connection_limit=1` on the URL. Upgrading to a paid plan is required for the IPv4 transaction pooler that removes the cap.
+`docker-compose.yml` supplies the internal Postgres connection string and Redis hostname; do not set `LITELLM_DATABASE_URL` for Compose. The Compose file deliberately does not publish Postgres or Redis ports to the host.
 
-### 3. Bootstrap and register the launcher keys
+### 3. Start the stack
 
 ```bash
-./setup.sh
-```
-
-This script will:
-
-- load your `.env`
-- verify local prerequisites
-- create/sync `.venv` using `uv`
-- generate the Prisma client LiteLLM expects
-- start LiteLLM on port `4000`
-- register the OpenAI and Gemini virtual keys used by the included launchers
-- tail the proxy log so you can confirm startup
-
-### 4. Start the proxy later
-
-Once the environment already exists, you can run:
-
-```bash
+# Prompts for Docker Compose or local mode. Choose Docker Compose.
 ./run.sh
+
+# Deterministic equivalent for documentation, teams, and automation.
+./run.sh docker
+docker compose ps
+docker compose logs -f litellm
 ```
+
+The `litellm` container uses LiteLLM's official `docker.litellm.ai/berriai/litellm:v1.91.1-stable` image, waits for healthy Postgres and Redis, and starts the proxy on `http://localhost:4000`. The one-shot `register-keys` service registers Claude Code virtual-key aliases once LiteLLM is healthy. Postgres and Redis data persist in named Docker volumes across restarts.
+
+### 4. Stop, update, or reset the stack
+
+```bash
+# Stop containers without deleting data.
+docker compose down
+
+# Rebuild and restart after config, dependency, or image changes.
+docker compose up --build -d
+
+# Destructive: delete all LiteLLM database and Redis data.
+docker compose down -v
+```
+
+## Local host-run setup
+
+If your organization already manages Redis and Postgres outside Docker, set `LITELLM_DATABASE_URL` in `.env` and use the local host-run flow:
+
+```bash
+./local/setup.sh
+
+# Later starts:
+./run.sh local
+# Equivalent direct command:
+./local/run.sh
+```
+
+`./local/update.sh` updates the host-managed Python dependencies and refreshes the virtual-key aliases. Docker Compose users update LiteLLM by changing the pinned official image tag in `docker-compose.yml`, then running `./run.sh docker`.
+
+> **Supabase Postgres note:** A Supabase free-tier database works for `LITELLM_DATABASE_URL`, but it enforces a small connection cap (commonly 15 in session mode). If you share one database across local proxies, keep each proxy small: this repo defaults to `--num_workers 1`, `database_connection_pool_limit: 1`, and `?connection_limit=1` on the URL.
 
 ## Default local ports
 
@@ -154,19 +166,19 @@ Those map Claude Code model aliases to the configured upstream models in `config
 
 ## Install and use the Claude Code launchers
 
-The `scripts/` directory is a relocatable launcher bundle. Copy it into the target repository under `.claude/litellm-launchers/`; do not replace the target repository's own `scripts/` directory.
+The `claude/` directory is a relocatable launcher bundle. Copy it into the target repository under `.claude/litellm-launchers/`; do not replace the target repository's own `scripts/` directory.
 
 The launchers resolve sibling scripts from their own directory, while preserving the target repository as the working directory. That keeps `.mcp.json` and `CLAUDE_PROJECT_DIR` scoped to the repository Claude Code should operate in.
 
 ```bash
 # Start the proxy first, from this repository.
-./setup.sh
-# For later starts, use: ./run.sh
+./run.sh docker
+# Or, for host-managed dependencies: ./run.sh local
 
 # Then install the launcher bundle in the target repository.
 cd ~/Developer/my-project
 mkdir -p .claude
-cp -R ~/Developer/litellm-proxy/scripts .claude/litellm-launchers
+cp -R ~/Developer/litellm-proxy/claude .claude/litellm-launchers
 
 # Start the model selector in a tmux workspace.
 .claude/litellm-launchers/start-tmux.sh my-project
@@ -178,7 +190,7 @@ To refresh the copied launcher bundle after updating this repository:
 
 ```bash
 rm -rf .claude/litellm-launchers
-cp -R ~/Developer/litellm-proxy/scripts .claude/litellm-launchers
+cp -R ~/Developer/litellm-proxy/claude .claude/litellm-launchers
 ```
 
 ## Optional: Claude Code themes with Tinty
@@ -253,10 +265,11 @@ It complements Tinty: use Tinty when you want scheme-driven Claude Code themes a
 Basic shell validation for the shipped scripts:
 
 ```bash
-bash -n setup.sh
 bash -n run.sh
-bash -n update.sh
-bash -n scripts/*.sh
+bash -n local/*.sh
+bash -n claude/*.sh
+sh -n register-keys.sh
+docker compose config --quiet
 ```
 
 ## Open-source boundary
