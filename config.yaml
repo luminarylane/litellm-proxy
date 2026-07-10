@@ -84,7 +84,9 @@ router_settings:
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
   database_url: "os.environ/LITELLM_DATABASE_URL"
-  database_connection_pool_limit: 1
+  # Local/external databases can retain a conservative cap; Docker Compose
+  # overrides this for its dedicated Postgres service.
+  database_connection_pool_limit: "os.environ/LITELLM_DATABASE_CONNECTION_POOL_LIMIT"
   database_connection_timeout: 10
   # --- SILENCE THE TOKEN COUNTING WARNINGS ---
   # Forces LiteLLM to use local tiktoken rules instantly.

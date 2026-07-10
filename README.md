@@ -33,7 +33,9 @@ It assumes:
 ## Files you should care about
 
 - `config.yaml` — canonical LiteLLM routing/config
-- `.env.example` — required environment variables and Docker Compose secrets
+- `.env.docker.example` — Docker Compose environment and dedicated-Postgres pool settings
+- `.env.local.example` — host-run environment and conservative external-Postgres pool settings
+- `.env.example` — pointer to the mode-specific templates
 - `run.sh` — root dispatcher: select Docker Compose or local host mode
 - `docker-compose.yml` — self-contained stack using LiteLLM's official proxy image, Postgres, and Redis
 - `register-keys.sh` — shared virtual-key registration used by Compose and `local/`
@@ -55,10 +57,10 @@ git clone https://github.com/luminarylane/litellm-proxy.git
 cd litellm-proxy
 ```
 
-### 2. Create your organization `.env`
+### 2. Create your Docker Compose `.env`
 
 ```bash
-cp .env.example .env
+cp .env.docker.example .env
 ```
 
 Set at least:
@@ -69,7 +71,7 @@ Set at least:
 - `POSTGRES_PASSWORD` (strong password for the bundled Postgres database)
 - `LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_OPENAI_5_6_VIRTUAL_KEY`, and `LITELLM_GEMINI_VIRTUAL_KEY`
 
-`docker-compose.yml` supplies the internal Postgres connection string and Redis hostname; do not set `LITELLM_DATABASE_URL` for Compose. The Compose file deliberately does not publish Postgres or Redis ports to the host.
+`docker-compose.yml` supplies the internal Postgres connection string and Redis hostname. It explicitly uses a 10-connection LiteLLM database pool with 10 overflow connections for the bundled dedicated Postgres service, overriding any local-mode pool variables; do not set `LITELLM_DATABASE_URL`, `REDIS_HOST`, or `REDIS_PORT` for Compose. The Compose file deliberately does not publish Postgres or Redis ports to the host.
 
 ### 3. Start the stack
 
@@ -100,9 +102,10 @@ docker compose down -v
 
 ## Local host-run setup
 
-If your organization already manages Redis and Postgres outside Docker, set `LITELLM_DATABASE_URL` in `.env` and use the local host-run flow:
+If your organization already manages Redis and Postgres outside Docker, create `.env` from the local template, set `LITELLM_DATABASE_URL`, and use the local host-run flow:
 
 ```bash
+cp .env.local.example .env
 ./local/setup.sh
 
 # Later starts:
@@ -111,7 +114,7 @@ If your organization already manages Redis and Postgres outside Docker, set `LIT
 ./local/run.sh
 ```
 
-`./local/update.sh` updates the host-managed Python dependencies and refreshes the virtual-key aliases. Docker Compose users update LiteLLM by changing the pinned official image tag in `docker-compose.yml`, then running `./run.sh docker`.
+`./local/update.sh` updates the host-managed Python dependencies and refreshes the virtual-key aliases. Local mode defaults `LITELLM_DATABASE_CONNECTION_POOL_LIMIT` to `1`, preserving the conservative setting for constrained external Postgres services. Docker Compose users update LiteLLM by changing the pinned official image tag in `docker-compose.yml`, then running `./run.sh docker`.
 
 > **Supabase Postgres note:** A Supabase free-tier database works for `LITELLM_DATABASE_URL`, but it enforces a small connection cap (commonly 15 in session mode). If you share one database across local proxies, keep each proxy small: this repo defaults to `--num_workers 1`, `database_connection_pool_limit: 1`, and `?connection_limit=1` on the URL.
 

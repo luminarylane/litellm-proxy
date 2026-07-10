@@ -51,7 +51,7 @@ echo "✅ .mcp.json found"
 
 if ! nc -z localhost 4000; then
   echo "❌ litellm is not running." >&2
-  echo "clone litellm-proxy repo (https://github.com/luminarylane/litellm-proxy) then ./setup.sh and then ./run.sh and try again." >&2
+  echo "clone litellm-proxy repo (https://github.com/luminarylane/litellm-proxy), configure .env from .env.docker.example, then run ./run.sh docker and try again." >&2
   exit 1
 fi
 echo "✅ litellm proxy is running and listening on port 4000."

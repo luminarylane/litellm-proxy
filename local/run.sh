@@ -9,7 +9,7 @@ REDIS_PORT="${REDIS_PORT:-6379}"
 
 if [ ! -f ".env" ]; then
     echo "❌ .env file is missing in current directory. Cannot start LiteLLM proxy." >&2
-    echo "Copy .env.example to .env and fill in the required values first." >&2
+    echo "Copy .env.local.example to .env and fill in the required values first." >&2
     exit 1
 fi
 echo "✅ .env file found. Loading variables..."
@@ -18,6 +18,7 @@ echo "✅ .env file found. Loading variables..."
 set -a
 source .env
 set +a
+export LITELLM_DATABASE_CONNECTION_POOL_LIMIT="${LITELLM_DATABASE_CONNECTION_POOL_LIMIT:-1}"
 
 required_vars=(
   OPENAI_API_KEY

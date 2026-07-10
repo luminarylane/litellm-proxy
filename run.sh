@@ -21,7 +21,7 @@ start_docker() {
   fi
 
   if [[ ! -f "$REPO_DIR/.env" ]]; then
-    echo "❌ .env is missing. Copy .env.example to .env and set the required secrets first." >&2
+    echo "❌ .env is missing. Copy .env.docker.example to .env and set the required secrets first." >&2
     exit 1
   fi
 
