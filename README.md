@@ -44,7 +44,7 @@ It assumes:
 
 ## Prerequisites
 
-For the recommended self-contained setup, install [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine with the Compose plugin. The host needs `tmux`, `claude`, `lazygit`, `curl`, and `nc` only when using the optional Claude Code launchers.
+For the recommended self-contained setup, install [Docker Desktop](https://www.docker.com/products/docker-desktop/), Docker Engine with the Compose plugin, or [Colima](https://github.com/abiosoft/colima) on macOS if you prefer a lighter Docker-compatible runtime than Docker Desktop. The host needs `tmux`, `claude`, `lazygit`, `curl`, and `nc` only when using the optional Claude Code launchers.
 
 The legacy host-run scripts additionally require [uv](https://docs.astral.sh/uv/getting-started/installation/), Redis on `localhost:6379`, and Postgres reachable from `LITELLM_DATABASE_URL`.
 
