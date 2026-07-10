@@ -24,6 +24,7 @@ required_vars=(
   LITELLM_MASTER_KEY
   LITELLM_DATABASE_URL
   LITELLM_OPENAI_VIRTUAL_KEY
+  LITELLM_OPENAI_5_6_VIRTUAL_KEY
   LITELLM_GEMINI_VIRTUAL_KEY
 )
 for var_name in "${required_vars[@]}"; do
@@ -112,6 +113,25 @@ done
 
 echo "✅ Proxy is healthy and running on port $LITELLM_PORT!"
 echo "🔄 Registering reusable virtual-key aliases for the included launchers..."
+
+# --- REGISTER THE OPENAI 5.6 FAMILU VIRTUAL PROFILE ---
+HTTP_CODE_OPENAI=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:${LITELLM_PORT}/key/generate" \
+     -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+     -H "Content-Type: application/json" \
+     -d "{
+       \"key\": \"$LITELLM_OPENAI_5_6_VIRTUAL_KEY\",
+       \"aliases\": {
+         \"claude-opus-4-7\": \"openai/gpt-5.6-sol\",
+         \"claude-sonnet-4-6\": \"openai/gpt-5.6-terra\",
+         \"claude-haiku-4-6\": \"openai/gpt-5.6-luna\"
+       }
+     }")
+
+if [ "$HTTP_CODE_OPENAI" -eq 200 ] || [ "$HTTP_CODE_OPENAI" -eq 201 ]; then
+    echo "✅ OpenAI 5.6 profile alias mapped to: $LITELLM_OPENAI_5_6_VIRTUAL_KEY"
+else
+    echo "❌ OpenAI key registration failed with HTTP status: $HTTP_CODE_OPENAI" >&2
+fi
 
 # --- REGISTER THE OPENAI VIRTUAL PROFILE ---
 HTTP_CODE_OPENAI=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:${LITELLM_PORT}/key/generate" \
