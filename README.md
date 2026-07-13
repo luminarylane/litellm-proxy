@@ -69,7 +69,7 @@ Set at least:
 - `LITELLM_MASTER_KEY` (strong administrator secret)
 - `LITELLM_SALT_KEY` (strong stable secret; do not rotate after LiteLLM stores credentials)
 - `POSTGRES_PASSWORD` (strong password for the bundled Postgres database)
-- `LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_OPENAI_5_6_VIRTUAL_KEY`, and `LITELLM_GEMINI_VIRTUAL_KEY`
+- `LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_OPENAI_5_6_VIRTUAL_KEY`, `LITELLM_GEMINI_VIRTUAL_KEY`
 
 `docker-compose.yml` supplies the internal Postgres connection string and Redis hostname. It explicitly uses a 10-connection LiteLLM database pool with 10 overflow connections for the bundled dedicated Postgres service, overriding any local-mode pool variables; do not set `LITELLM_DATABASE_URL`, `REDIS_HOST`, or `REDIS_PORT` for Compose. The Compose file deliberately does not publish Postgres or Redis ports to the host.
 
@@ -135,7 +135,7 @@ Log in with `LITELLM_MASTER_KEY` as the password (default username is `admin`).
 
 You can override the UI credentials by setting `UI_USERNAME` and `UI_PASSWORD` in your `.env` before starting the proxy.
 
-> This password is only for the `/ui` admin interface. Claude Code requests still authenticate with the virtual keys (`LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_OPENAI_5_6_VIRTUAL_KEY`, and `LITELLM_GEMINI_VIRTUAL_KEY`).
+> This password is only for the `/ui` admin interface. Claude Code requests still authenticate with the virtual keys (`LITELLM_OPENAI_VIRTUAL_KEY`, `LITELLM_OPENAI_5_6_VIRTUAL_KEY`, `LITELLM_GEMINI_VIRTUAL_KEY`).
 
 From there you can inspect registered virtual keys, track spend, view request logs, and manage model routing without touching `config.yaml` directly.
 
@@ -167,7 +167,6 @@ Those map Claude Code model aliases to the configured upstream models in `config
 - `claude-sonnet-4-6` → `gemini/gemini-3.1-pro-preview`
 - `claude-haiku-4-6` → `gemini/gemini-3.5-flash`
 
-## Install and use the Claude Code launchers
 ### Kimi Coding Plan launcher
 
 The Kimi launcher is a direct Claude Code launcher to Kimi's official endpoint. It is not a LiteLLM route and its requests are not centrally LiteLLM-metered:
@@ -176,6 +175,17 @@ The Kimi launcher is a direct Claude Code launcher to Kimi's official endpoint. 
 - It uses Kimi's documented `CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144` setting only; it does not impose model mappings or thinking, output, or effort profiles.
 - Install Claude Code using Kimi's documented setup script before launching; this launcher only validates that `claude` is installed and does not run third-party installation scripts.
 
+### Z.ai Coding Plan launchers
+
+The two Z.ai launchers connect Claude Code directly to Z.ai’s Anthropic-compatible Coding Plan endpoint. They are not LiteLLM routes, so requests are not centrally LiteLLM-metered.
+
+- Set `ZAI_CODING_API_KEY` in the target repository environment or local `.env.local`; each launcher exports it as `ANTHROPIC_AUTH_TOKEN`, clears `ANTHROPIC_API_KEY`, and uses `https://api.z.ai/api/anthropic`.
+- `start-claude-glm-5-2.sh` maps every Claude Code tier (Opus, Sonnet, and Haiku) to `glm-5.2`. It does not impose undocumented compact/context overrides.
+- `start-claude-glm-4-7.sh` maps every Claude Code tier to `glm-4.7` and explicitly constrains sessions to a short 200k context window.
+- The choices intentionally do not cross-map model tiers.
+- GLM remains removed from LiteLLM config, keys, and templates. Migrate former proxy credentials by removing `ZAI_API_KEY`, `LITELLM_GLM_5_2_VIRTUAL_KEY`, and `LITELLM_GLM_4_7_VIRTUAL_KEY` from the proxy `.env`; put `ZAI_CODING_API_KEY` in the target repository environment or `.env.local`.
+
+## Install and use the Claude Code launchers
 
 The `claude/` directory is a relocatable launcher bundle. Copy it into the target repository under `.claude/litellm-launchers/`; do not replace the target repository's own `scripts/` directory.
 
@@ -184,7 +194,6 @@ The launchers resolve sibling scripts from their own directory, while preserving
 ```bash
 # Start the proxy first, from this repository.
 ./run.sh docker
-# Or, for host-managed dependencies: ./run.sh local
 
 # Then install the launcher bundle in the target repository.
 cd ~/Developer/my-project
@@ -195,7 +204,7 @@ cp -R ~/Developer/litellm-proxy/claude .claude/litellm-launchers
 .claude/litellm-launchers/start-tmux.sh my-project
 ```
 
-The target repository must provide `.mcp.json`. The LiteLLM-backed choices (GPT, Gemini, and Z.ai) require the local proxy to be running on `localhost:4000`; provider credentials are read from the proxy's environment. Kimi connects directly to its official endpoint and instead requires `KIMI_CODING_API_KEY` in the target repository's environment or local `.env.local`.
+The target repository must provide `.mcp.json`. The LiteLLM-backed choices (GPT and Gemini) require the local proxy to be running on `localhost:4000`; provider credentials are read from the proxy's environment. Kimi and both Z.ai Coding Plan choices connect directly and require `KIMI_CODING_API_KEY` or `ZAI_CODING_API_KEY`, respectively, in the target repository's environment or local `.env.local`.
 
 To refresh the copied launcher bundle after updating this repository:
 
