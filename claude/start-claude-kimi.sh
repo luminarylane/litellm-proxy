@@ -2,44 +2,20 @@
 set -euo pipefail
 
 ENV_FILE=".env.local"
-
-if [ ! -f "$ENV_FILE" ]; then
-    echo "❌ $ENV_FILE not found."
-    exit 1
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
 fi
-echo "✅ $ENV_FILE file found"
 
-set -a
-source "$ENV_FILE"
-set +a
+: "${KIMI_CODING_API_KEY:[REDACTED:API key param] must be set in the environment or local .env.local.}"
 
-REQUIRED_KEY="KIMI_CODE_KEY"
-
-if [ -z "${!REQUIRED_KEY}" ]; then
-    echo "❌ The required key '$REQUIRED_KEY' is not set or is empty."
-    exit 1
-fi
-echo "✅ '$REQUIRED_KEY' is set."
-
-# LiteLLM and model specific vars
-LITELLM_BASE_URL=https://api.kimi.com/coding/
-LITELLM_VIRTUAL_KEY=$KIMI_CODE_KEY
-LITELLM_MODEL_NAME="kimi-for-coding"
-
-# Default model names
-DEFAULT_OPUS_MODEL="kimi-for-coding"
-DEFAULT_SONNET_MODEL="kimi-for-coding"
-DEFAULT_HAIKU_MODEL="kimi-for-coding"
-
-# Model specific details, autocompact at 80%
-MODEL_MAX_TOKEN_WINDOW=262144
-MODEL_AUTO_COMPACT_WINDOW=209715
-
-if ! which claude &>/dev/null; then
+if ! command -v claude &>/dev/null; then
   echo "❌ claude is not installed." >&2
   echo "please install it and try again." >&2
   exit 2
 fi
+
 echo "✅ claude is installed."
 
 if [[ ! -f .mcp.json ]]; then
@@ -47,56 +23,15 @@ if [[ ! -f .mcp.json ]]; then
   echo "run this launcher from the repository you want Claude Code to work in." >&2
   exit 1
 fi
+
 echo "✅ .mcp.json found"
 
-if ! nc -z localhost 4000; then
-  echo "❌ litellm is not running." >&2
-  echo "clone litellm-proxy repo (https://github.com/luminarylane/litellm-proxy), configure .env from .env.docker.example, then run ./run.sh docker and try again." >&2
-  exit 1
-fi
-echo "✅ litellm proxy is running and listening on port 4000."
+unset ANTHROPIC_API_KEY
+export ANTHROPIC_BASE_URL="https://api.kimi.com/coding/"
+export ANTHROPIC_AUTH_TOKEN="$KIMI_CODING_API_KEY"
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144
 
-# Token use optimizations
-MODEL_AUTOCOMPACT_PCT_OVERRIDE=80
-MODEL_MAX_OUTPUT_TOKENS=32768
-CODE_EFFORT_LEVEL="medium"
-MAX_THINKING_TOKENS=4000
-API_TIMEOUT_MS=300000
-BASH_MAX_OUTPUT_LENGTH=25000
-BASH_DEFAULT_TIMEOUT_MS=180000
-
-export ANTHROPIC_BASE_URL=$LITELLM_BASE_URL && \
-export ANTHROPIC_AUTH_TOKEN=$LITELLM_VIRTUAL_KEY && \
-export ANTHROPIC_MODEL=$LITELLM_MODEL_NAME && \
-export ANTHROPIC_DEFAULT_OPUS_MODEL=$DEFAULT_OPUS_MODEL && \
-export ANTHROPIC_DEFAULT_SONNET_MODEL=$DEFAULT_SONNET_MODEL && \
-export ANTHROPIC_DEFAULT_HAIKU_MODEL=$DEFAULT_HAIKU_MODEL && \
-export CLAUDE_CODE_MAX_CONTEXT_TOKENS=$MODEL_MAX_TOKEN_WINDOW && \
-export CLAUDE_CODE_AUTO_COMPACT_WINDOW=$MODEL_AUTO_COMPACT_WINDOW && \
-export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$MODEL_AUTOCOMPACT_PCT_OVERRIDE && \
-export CLAUDE_CODE_MAX_OUTPUT_TOKENS=$MODEL_MAX_OUTPUT_TOKENS && \
-export CLAUDE_CODE_EFFORT_LEVEL=$CODE_EFFORT_LEVEL && \
-export MAX_THINKING_TOKENS=$MAX_THINKING_TOKENS && \
-export API_TIMEOUT_MS=$API_TIMEOUT_MS && \
-export BASH_MAX_OUTPUT_LENGTH=$BASH_MAX_OUTPUT_LENGTH && \
-export BASH_DEFAULT_TIMEOUT_MS=$BASH_DEFAULT_TIMEOUT_MS && \
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 && \
-export DISABLE_NON_ESSENTIAL_MODEL_CALLS=1 && \
-export ENABLE_TOOL_SEARCH=true && \
-export DISABLE_TELEMETRY=1 && \
-export CLAUDE_CODE_ENABLE_TELEMETRY=0 && \
-export DISABLE_BUG_COMMAND=1 && \
-export DISABLE_COST_WARNINGS=1 && \
-export DISABLE_ERROR_REPORTING=1 && \
-export CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1 && \
-export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1 && \
-export CLAUDE_CODE_NO_FLICKER=1 && \
-export MCP_CONNECTION_NONBLOCKING=true && \
-export CLAUDE_PROJECT_DIR=$(pwd) && \
 claude \
---continue \
---permission-mode=bypassPermissions \
---brief \
---mcp-config ./.mcp.json \
---model $LITELLM_MODEL_NAME \
---name "Moonshot-$LITELLM_MODEL_NAME"
+  --continue \
+  --permission-mode=bypassPermissions \
+  --mcp-config ./.mcp.json

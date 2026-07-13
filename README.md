@@ -168,6 +168,14 @@ Those map Claude Code model aliases to the configured upstream models in `config
 - `claude-haiku-4-6` → `gemini/gemini-3.5-flash`
 
 ## Install and use the Claude Code launchers
+### Kimi Coding Plan launcher
+
+The Kimi launcher is a direct Claude Code launcher to Kimi's official endpoint. It is not a LiteLLM route and its requests are not centrally LiteLLM-metered:
+
+- Set `KIMI_CODING_API_KEY` in the target repository's environment or its local `.env.local`; the launcher exports it as `ANTHROPIC_AUTH_TOKEN` (and clears `ANTHROPIC_API_KEY`) and uses `https://api.kimi.com/coding/`.
+- It uses Kimi's documented `CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144` setting only; it does not impose model mappings or thinking, output, or effort profiles.
+- Install Claude Code using Kimi's documented setup script before launching; this launcher only validates that `claude` is installed and does not run third-party installation scripts.
+
 
 The `claude/` directory is a relocatable launcher bundle. Copy it into the target repository under `.claude/litellm-launchers/`; do not replace the target repository's own `scripts/` directory.
 
@@ -187,7 +195,7 @@ cp -R ~/Developer/litellm-proxy/claude .claude/litellm-launchers
 .claude/litellm-launchers/start-tmux.sh my-project
 ```
 
-The target repository must provide `.mcp.json`. The LiteLLM-backed choices also require the local proxy to be running on `localhost:4000`; Kimi and Z.ai choices use their direct provider endpoints and their credentials are read from the target repository's `.env.local`.
+The target repository must provide `.mcp.json`. The LiteLLM-backed choices (GPT, Gemini, and Z.ai) require the local proxy to be running on `localhost:4000`; provider credentials are read from the proxy's environment. Kimi connects directly to its official endpoint and instead requires `KIMI_CODING_API_KEY` in the target repository's environment or local `.env.local`.
 
 To refresh the copied launcher bundle after updating this repository:
 
