@@ -6,9 +6,8 @@ This repo packages a local LiteLLM proxy with:
 
 - env-driven model routing in `config.yaml`
 - bootstrap and run scripts for a fresh clone
-- reusable virtual-key registration for Claude Code launchers
+- reusable virtual-key registration for downstream clients
 - a Docker Compose stack that bundles LiteLLM, Postgres, and Redis
-- tmux launchers for OpenAI/Codex-style and Gemini-backed Claude Code sessions
 
 ## What this repo is for
 
@@ -16,7 +15,7 @@ Use this repo when you want a single local LiteLLM proxy that:
 
 - exposes a stable endpoint on `localhost:4000`
 - routes Claude Code requests to named upstream models
-- registers reusable virtual keys for different launcher profiles
+- registers reusable virtual keys for different client profiles
 - gives teammates a reproducible setup without relying on one person's `~/Developer/...` layout
 
 ## What this repo is not
@@ -40,11 +39,12 @@ It assumes:
 - `docker-compose.yml` — self-contained stack using LiteLLM's official proxy image, Postgres, and Redis
 - `register-keys.sh` — shared virtual-key registration used by Compose and `local/`
 - `local/` — host-managed runtime scripts (`setup.sh`, `run.sh`, and `update.sh`)
-- `claude/` — relocatable Claude Code launchers (tuned per backend; share `_common.sh`) to copy into a target repository
+
+> The Claude Code / Codex **launcher bundles** (formerly `claude/` and `codex/`) have moved to their own repo — **[luminarylane/code-gen-optim](https://github.com/luminarylane/code-gen-optim)** — and no longer depend on this proxy.
 
 ## Prerequisites
 
-For the recommended self-contained setup, install [Docker Desktop](https://www.docker.com/products/docker-desktop/), Docker Engine with the Compose plugin, or [Colima](https://github.com/abiosoft/colima) on macOS if you prefer a lighter Docker-compatible runtime than Docker Desktop. The host needs `tmux`, `claude`, `lazygit`, `curl`, and `nc` only when using the optional Claude Code launchers.
+For the recommended self-contained setup, install [Docker Desktop](https://www.docker.com/products/docker-desktop/), Docker Engine with the Compose plugin, or [Colima](https://github.com/abiosoft/colima) on macOS if you prefer a lighter Docker-compatible runtime than Docker Desktop.
 
 The legacy host-run scripts additionally require [uv](https://docs.astral.sh/uv/getting-started/installation/), Redis on `localhost:6379`, and Postgres reachable from `LITELLM_DATABASE_URL`.
 
@@ -167,131 +167,6 @@ Those map Claude Code model aliases to the configured upstream models in `config
 - `claude-sonnet-4-6` → `gemini/gemini-3.1-pro-preview`
 - `claude-haiku-4-6` → `gemini/gemini-3.5-flash`
 
-### Work modes (fast / default / deep)
-
-`start-tmux.sh` runs `select-claude-model.sh`, which prompts for a work mode after the model choice. `CLAUDE_PROFILE` (`fast`, `default`, `deep`; default `default`) is tailored per backend rather than shared:
-
-- **Claude (native, `start-claude-claude.sh`)** — `fast` runs **Sonnet** at `--effort low`; `default` runs **Opus Plan Mode** (`opusplan`: Opus plans, Sonnet executes) at `--effort medium`; `deep` runs flat **Opus** at `--effort high`. Model tier is the biggest redo-vs-cost lever, so `fast` drops to Sonnet and only `deep` pays for full Opus execution. This launcher protects Anthropic's 1-hour prompt cache: it passes `--exclude-dynamic-system-prompt-sections` and leaves auto-compaction at the default, because forcing early compaction rewrites and burns the warm cache.
-- **GPT (`start-claude-gpt-5-6.sh`, `start-claude-gpt-5-4.sh`)** — profile sets `--effort` and the output ceiling. Anthropic prompt caching does not survive the LiteLLM route to OpenAI, so these compact late (~90% of the context window) to keep the prefix stable for OpenAI's own server-side cache. The effort-to-OpenAI mapping through LiteLLM is unverified.
-- **Gemini (`start-claude-gemini.sh`)** — profile sets only the output ceiling; `--effort` is not passed because it is inert on Gemini (Gemini uses a thinking budget, not effort). Compacts late for Gemini's implicit cache.
-
-All launchers source `claude/_common.sh` for backend-agnostic plumbing: one non-essential-traffic umbrella flag, deferred tool search, an MCP output cap, and bash output limits. `MAX_THINKING_TOKENS` is intentionally not set anywhere — adaptive-thinking models (Opus 4.8+) ignore it.
-
-### Kimi Coding Plan launcher
-
-The Kimi launcher is a direct Claude Code launcher to Kimi's official endpoint. It is not a LiteLLM route and its requests are not centrally LiteLLM-metered:
-
-- Set `KIMI_CODING_API_KEY` in the target repository's environment or its local `.env.local`; the launcher exports it as `ANTHROPIC_AUTH_TOKEN` (and clears `ANTHROPIC_API_KEY`) and uses `https://api.kimi.com/coding/`.
-- It uses Kimi's documented `CLAUDE_CODE_AUTO_COMPACT_WINDOW=262144` setting only; it does not impose model mappings or thinking, output, or effort profiles.
-- Install Claude Code using Kimi's documented setup script before launching; this launcher only validates that `claude` is installed and does not run third-party installation scripts.
-
-### Z.ai Coding Plan launchers
-
-The two Z.ai launchers connect Claude Code directly to Z.ai’s Anthropic-compatible Coding Plan endpoint. They are not LiteLLM routes, so requests are not centrally LiteLLM-metered.
-
-- Set `ZAI_CODING_API_KEY` in the target repository environment or local `.env.local`; each launcher exports it as `ANTHROPIC_AUTH_TOKEN`, clears `ANTHROPIC_API_KEY`, and uses `https://api.z.ai/api/anthropic`.
-- `start-claude-glm-5-2.sh` maps every Claude Code tier (Opus, Sonnet, and Haiku) to `glm-5.2`. It does not impose undocumented compact/context overrides.
-- `start-claude-glm-4-7.sh` maps every Claude Code tier to `glm-4.7` and explicitly constrains sessions to a short 200k context window.
-- The choices intentionally do not cross-map model tiers.
-- GLM remains removed from LiteLLM config, keys, and templates. Migrate former proxy credentials by removing `ZAI_API_KEY`, `LITELLM_GLM_5_2_VIRTUAL_KEY`, and `LITELLM_GLM_4_7_VIRTUAL_KEY` from the proxy `.env`; put `ZAI_CODING_API_KEY` in the target repository environment or `.env.local`.
-
-## Install and use the Claude Code launchers
-
-The `claude/` directory is a relocatable launcher bundle. Copy it into the target repository under `.claude/litellm-launchers/`; do not replace the target repository's own `scripts/` directory.
-
-The launchers resolve sibling scripts from their own directory, while preserving the target repository as the working directory. That keeps `.mcp.json` and `CLAUDE_PROJECT_DIR` scoped to the repository Claude Code should operate in.
-
-The bundle includes `_common.sh`, which every profile-driven launcher sources for shared checks and environment. Copying the whole `claude/` directory (as below) keeps it alongside the launchers.
-
-```bash
-# Start the proxy first, from this repository.
-./run.sh docker
-
-# Then install the launcher bundle in the target repository.
-cd ~/Developer/my-project
-mkdir -p .claude
-cp -R ~/Developer/litellm-proxy/claude .claude/litellm-launchers
-
-# Start the model selector in a tmux workspace.
-.claude/litellm-launchers/start-tmux.sh my-project
-```
-
-The target repository must provide `.mcp.json`. The LiteLLM-backed choices (GPT and Gemini) require the local proxy to be running on `localhost:4000`; provider credentials are read from the proxy's environment. Kimi and both Z.ai Coding Plan choices connect directly and require `KIMI_CODING_API_KEY` or `ZAI_CODING_API_KEY`, respectively, in the target repository's environment or local `.env.local`.
-
-To refresh the copied launcher bundle after updating this repository:
-
-```bash
-rm -rf .claude/litellm-launchers
-cp -R ~/Developer/litellm-proxy/claude .claude/litellm-launchers
-```
-
-## Optional: Claude Code themes with Tinty
-
-[Tinty](https://github.com/tinted-theming/tinty) and [tinted-claude-code](https://github.com/tinted-theming/tinted-claude-code) compile Base16, Base24, and Tinted8 color schemes into Claude Code themes. Claude Code hot-reloads the theme file, so switching a Tinty scheme updates the active session without a restart.
-
-### Default: one hot-reloaded theme
-
-Add the following item to `~/.config/tinted-theming/tinty/config.toml`. The executable flavor is recommended because it provides themed diffs and shimmer effects; it requires Node.js.
-
-```toml
-[[items]]
-name = "tinted-claude-code"
-path = "https://github.com/tinted-theming/tinted-claude-code"
-themes-dir = "scripts"
-theme-file-extension = ".js"
-supported-systems = ["base16", "base24", "tinted8"]
-hook = "mkdir -p \"$HOME/.claude/themes\" && node \"$TINTY_THEME_FILE_PATH\" > \"$HOME/.claude/themes/tinty.json\""
-```
-
-Install the bindings and apply a scheme:
-
-```bash
-tinty install
-tinty apply base16-ayu-dark
-```
-
-The first time only, start Claude Code and run `/theme`, then select **Tinty**. Claude Code stores this as `custom:tinty`; later `tinty apply` calls replace `~/.claude/themes/tinty.json`, which all instances using that theme hot-reload.
-
-For a static JSON-only setup, use `themes` and `.json` instead, with this hook:
-
-```toml
-hook = "mkdir -p \"$HOME/.claude/themes\" && cp -f \"$TINTY_THEME_FILE_PATH\" \"$HOME/.claude/themes/tinty.json\""
-```
-
-### Optional: distinct colors for concurrent Claude Code instances
-
-The default `tinty.json` is intentionally shared, so switching it updates every running Claude Code instance that selected **Tinty**. If you run several instances and want each to have a distinct color, copy the static JSON themes from the [tinted-claude-code `themes/` directory](https://github.com/tinted-theming/tinted-claude-code/tree/main/themes) to the global Claude Code theme directory using different filenames:
-
-```bash
-mkdir -p ~/.claude/themes
-cp ~/Developer/tinted-claude-code/themes/base16-ayu-dark.json ~/.claude/themes/stream-a.json
-cp ~/Developer/tinted-claude-code/themes/base16-dracula.json ~/.claude/themes/stream-b.json
-```
-
-In each running instance, use `/theme` and select its corresponding custom theme. Theme discovery is global (`~/.claude/themes`), while the selection is per Claude Code instance, so `stream-a` and `stream-b` can run side-by-side with independent colors. Use the `tinty.json` workflow when a single coordinated theme is preferable; use named static files when visual differentiation matters more.
-
-## Optional: token and context efficiency
-
-These add-ons trim the *cheap* layers — repeated file/shell reads and verbose output prose. Useful, but calibrate expectations: on native Anthropic the dominant cost lever is **prompt caching** (the large static prefix re-reads at roughly a tenth of input price), which the launchers already protect. Output prose and repeated reads are a small share of agentic-coding cost next to input context and thinking.
-
-- **[caveman](https://github.com/JuliusBrussee/caveman)** — a Claude Code plugin that trims verbose model output (~65–75% fewer output tokens). Real but modest, and low-risk to code quality: it compresses human-facing prose only, leaving thinking, tool I/O, and code blocks untouched.
-- **[lean-ctx](https://github.com/yvgude/lean-ctx)** — a context runtime that compresses repeated file reads and shell output and manages cross-session memory. Note the overlap with prompt caching: on native Anthropic, caching already discounts repeated reads, so lean-ctx's marginal saving there is small (~3–4% in one measured setup) while adding a `ctx_*` tool layer. It is better matched to backends **without** prompt caching (e.g. a proxy routing to a non-Anthropic model).
-
-Neither is required. The largest runway levers are elsewhere: prompt caching (native), the right model tier for the task, and getting work right the first time so tokens are not spent redoing it.
-
-## Optional: Claude Code developer experience with TweakCC
-
-**[TweakCC](https://github.com/Piebald-AI/tweakcc)** is a visual and interaction customization tool for Claude Code. It does not reduce token use, but it can make long-running, multi-instance workflows clearer and more pleasant.
-
-Use it to experiment with:
-
-- themes, color palettes, and interface styling
-- thinking verbs, spinners, and other feedback states
-- input and chat presentation
-- system prompts and custom toolsets
-
-It complements Tinty: use Tinty when you want scheme-driven Claude Code themes and hot reloads; use TweakCC when you want broader CLI presentation and interaction customization.
-
 ## Validation
 
 Basic shell validation for the shipped scripts:
@@ -299,7 +174,6 @@ Basic shell validation for the shipped scripts:
 ```bash
 bash -n run.sh
 bash -n local/*.sh
-bash -n claude/*.sh
 sh -n register-keys.sh
 docker compose config --quiet
 ```
