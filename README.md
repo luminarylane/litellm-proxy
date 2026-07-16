@@ -40,7 +40,7 @@ It assumes:
 - `docker-compose.yml` — self-contained stack using LiteLLM's official proxy image, Postgres, and Redis
 - `register-keys.sh` — shared virtual-key registration used by Compose and `local/`
 - `local/` — host-managed runtime scripts (`setup.sh`, `run.sh`, and `update.sh`)
-- `claude/` — relocatable Claude Code launchers to copy into a target repository
+- `claude/` — relocatable Claude Code launchers (tuned per backend; share `_common.sh`) to copy into a target repository
 
 ## Prerequisites
 
@@ -85,7 +85,7 @@ docker compose ps
 docker compose logs -f litellm
 ```
 
-The `litellm` container uses LiteLLM's official `docker.litellm.ai/berriai/litellm:v1.91.1-stable` image, waits for healthy Postgres and Redis, and starts the proxy on `http://localhost:4000`. The one-shot `register-keys` service registers Claude Code virtual-key aliases once LiteLLM is healthy. Postgres and Redis data persist in named Docker volumes across restarts.
+The `litellm` container uses LiteLLM's official `docker.litellm.ai/berriai/litellm:v1.92.0` image, waits for healthy Postgres and Redis, and starts the proxy on `http://localhost:4000`. The one-shot `register-keys` service registers Claude Code virtual-key aliases once LiteLLM is healthy. Postgres and Redis data persist in named Docker volumes across restarts.
 
 ### 4. Stop, update, or reset the stack
 
@@ -167,6 +167,16 @@ Those map Claude Code model aliases to the configured upstream models in `config
 - `claude-sonnet-4-6` → `gemini/gemini-3.1-pro-preview`
 - `claude-haiku-4-6` → `gemini/gemini-3.5-flash`
 
+### Work modes (fast / default / deep)
+
+`start-tmux.sh` runs `select-claude-model.sh`, which prompts for a work mode after the model choice. `CLAUDE_PROFILE` (`fast`, `default`, `deep`; default `default`) is tailored per backend rather than shared:
+
+- **Claude (native, `start-claude-claude.sh`)** — `fast` runs **Sonnet** at `--effort low`; `default` runs **Opus Plan Mode** (`opusplan`: Opus plans, Sonnet executes) at `--effort medium`; `deep` runs flat **Opus** at `--effort high`. Model tier is the biggest redo-vs-cost lever, so `fast` drops to Sonnet and only `deep` pays for full Opus execution. This launcher protects Anthropic's 1-hour prompt cache: it passes `--exclude-dynamic-system-prompt-sections` and leaves auto-compaction at the default, because forcing early compaction rewrites and burns the warm cache.
+- **GPT (`start-claude-gpt-5-6.sh`, `start-claude-gpt-5-4.sh`)** — profile sets `--effort` and the output ceiling. Anthropic prompt caching does not survive the LiteLLM route to OpenAI, so these compact late (~90% of the context window) to keep the prefix stable for OpenAI's own server-side cache. The effort-to-OpenAI mapping through LiteLLM is unverified.
+- **Gemini (`start-claude-gemini.sh`)** — profile sets only the output ceiling; `--effort` is not passed because it is inert on Gemini (Gemini uses a thinking budget, not effort). Compacts late for Gemini's implicit cache.
+
+All launchers source `claude/_common.sh` for backend-agnostic plumbing: one non-essential-traffic umbrella flag, deferred tool search, an MCP output cap, and bash output limits. `MAX_THINKING_TOKENS` is intentionally not set anywhere — adaptive-thinking models (Opus 4.8+) ignore it.
+
 ### Kimi Coding Plan launcher
 
 The Kimi launcher is a direct Claude Code launcher to Kimi's official endpoint. It is not a LiteLLM route and its requests are not centrally LiteLLM-metered:
@@ -190,6 +200,8 @@ The two Z.ai launchers connect Claude Code directly to Z.ai’s Anthropic-compat
 The `claude/` directory is a relocatable launcher bundle. Copy it into the target repository under `.claude/litellm-launchers/`; do not replace the target repository's own `scripts/` directory.
 
 The launchers resolve sibling scripts from their own directory, while preserving the target repository as the working directory. That keeps `.mcp.json` and `CLAUDE_PROJECT_DIR` scoped to the repository Claude Code should operate in.
+
+The bundle includes `_common.sh`, which every profile-driven launcher sources for shared checks and environment. Copying the whole `claude/` directory (as below) keeps it alongside the launchers.
 
 ```bash
 # Start the proxy first, from this repository.

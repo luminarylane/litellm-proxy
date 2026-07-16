@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
+# Work mode applies only to the native Claude launcher (the standalone agents
+# codex/agy and the direct GLM/Kimi launchers do not read CLAUDE_PROFILE).
 choose_profile() {
   clear
   echo "╔══════════════════════════════════════════════════════════════╗"
@@ -10,11 +12,11 @@ choose_profile() {
   echo "╚══════════════════════════════════════════════════════════════╝"
   echo
   echo "  [1] Fast      Focused edits, searches, and quick fixes"
-  echo "               Lower reasoning + 4k thinking cap"
+  echo "               Low effort; drops to Sonnet"
   echo "  [2] Balanced  Everyday implementation and debugging  [default]"
-  echo "               Model-tuned reasoning + 8k thinking cap"
+  echo "               Medium effort; Opus Plan Mode (Opus plans, Sonnet executes)"
   echo "  [3] Deep      Architecture, difficult bugs, and broad reviews"
-  echo "               Higher reasoning + 16k thinking cap"
+  echo "               High effort; full Opus"
   echo
   read -r -p "Choose work mode [1-3, Enter=Balanced]: " profile_choice
 
@@ -35,58 +37,53 @@ echo "║                 CLAUDE CODE • MODEL SELECTOR                 ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo
 echo "  [1] Claude       1M  • Best subscription value; hardest work"
-echo "      Opus / Sonnet / Haiku family"
-echo "  [2] GPT-5.6      1.05M • Strong general-purpose coding"
-echo "      Sol / Terra / Luna family"
-echo "  [3] GPT-5.4      400k • Capable, balanced API option"
-echo "      GPT-5.5 / GPT-5.4 / GPT-5.4-mini family"
+echo "      Opus / Sonnet / Haiku family (native, caching works)"
+echo "  [2] GPT — Codex        • OpenAI's native agent; use your OpenAI credits"
+echo "  [3] Gemini — Antigravity • Google's native agent (agy CLI)"
 echo "  [4] Kimi Coding Plan    262k • Direct Kimi; not LiteLLM-metered"
 echo "  [5] Z.ai GLM-5.2  1M • Direct Z.ai; all Claude tiers map to GLM-5.2"
 echo "  [6] Z.ai GLM-4.7  200k • Direct Z.ai; all Claude tiers map to GLM-4.7"
-echo "  [7] Gemini 3.1   1M  • Large-context analysis and coding"
+echo
+echo "  GPT and Gemini run in their OWN agents (Codex / Antigravity), NOT through"
+echo "  the LiteLLM bridge — routing them via Claude Code was measured to burn"
+echo "  tokens with no prompt caching. Right tool, right job."
 echo
 echo "  [q] Quit"
 echo
-read -r -p "Choose model [1-7]: " choice
+read -r -p "Choose model [1-6]: " choice
 
 case "$choice" in
   1)
-    MODEL_LABEL="Claude family"
-    LAUNCHER="$SCRIPT_DIR/start-claude-claude.sh"
+    echo "▶ Starting Claude family (native)..."
+    choose_profile
+    echo "▶ Work mode: $CLAUDE_PROFILE"
+    CLAUDE_PROFILE="$CLAUDE_PROFILE" "$SCRIPT_DIR/start-claude-claude.sh"
     ;;
   2)
-    MODEL_LABEL="GPT-5.6 family"
-    LAUNCHER="$SCRIPT_DIR/start-claude-gpt-5-6.sh"
+    echo "▶ Starting OpenAI Codex..."
+    exec codex
     ;;
   3)
-    MODEL_LABEL="GPT-5.4 family"
-    LAUNCHER="$SCRIPT_DIR/start-claude-gpt-5-4.sh"
+    echo "▶ Starting Google Antigravity (agy)..."
+    exec agy
     ;;
   4)
-    MODEL_LABEL="Kimi Coding Plan"
-    LAUNCHER="$SCRIPT_DIR/start-claude-kimi.sh"
+    echo "▶ Starting Kimi Coding Plan (direct)..."
+    exec "$SCRIPT_DIR/start-claude-kimi.sh"
     ;;
   5)
-    MODEL_LABEL="Z.ai GLM-5.2"
-    LAUNCHER="$SCRIPT_DIR/start-claude-glm-5-2.sh"
+    echo "▶ Starting Z.ai GLM-5.2 (direct)..."
+    exec "$SCRIPT_DIR/start-claude-glm-5-2.sh"
     ;;
   6)
-    MODEL_LABEL="Z.ai GLM-4.7 (short 200k-context sessions)"
-    LAUNCHER="$SCRIPT_DIR/start-claude-glm-4-7.sh"
-    ;;
-  7)
-    MODEL_LABEL="Gemini 3.1 family"
-    LAUNCHER="$SCRIPT_DIR/start-claude-gemini.sh"
+    echo "▶ Starting Z.ai GLM-4.7 (direct, short 200k-context sessions)..."
+    exec "$SCRIPT_DIR/start-claude-glm-4-7.sh"
     ;;
   q|Q)
     exit 0
     ;;
   *)
-    echo "❌ Invalid model. Choose 1-7, or q to quit." >&2
+    echo "❌ Invalid model. Choose 1-6, or q to quit." >&2
     exit 1
     ;;
 esac
-
-choose_profile
-echo "▶ Starting $MODEL_LABEL in $CLAUDE_PROFILE mode..."
-CLAUDE_PROFILE="$CLAUDE_PROFILE" "$LAUNCHER"

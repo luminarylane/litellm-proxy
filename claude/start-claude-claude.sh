@@ -1,64 +1,80 @@
 #!/bin/bash
+# Native Claude Code on Anthropic (claude.ai / firstParty).
+# Tailored lever: PROMPT CACHING. On this backend the 1h ephemeral cache is real
+# and measured (a warm prefix re-reads at ~10% price). Everything here protects
+# that cache. Reasoning is tuned via --effort; MAX_THINKING_TOKENS is NOT set
+# because adaptive-thinking models ignore it (verified: the outgoing request
+# carries thinking:{type:adaptive} with no budget regardless).
+#
+# Browser: --chrome is OPT-IN (CLAUDE_CHROME=1). It streams live page DOM and
+# screenshots into the main context and guzzles tokens. Default off — routine
+# browser work should use the agent-browser CLI (compact ~200-400 token a11y
+# snapshots, run via Bash: `agent-browser open <url>` / `snapshot -i` / `click @e2`).
 set -euo pipefail
 
-if ! which claude &>/dev/null; then
-  echo "❌ claude is not installed." >&2
-  echo "please install it and try again." >&2
-  exit 2
-fi
-echo "✅ claude is installed."
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_common.sh
+source "$SCRIPT_DIR/_common.sh"
 
-if [[ ! -f .mcp.json ]]; then
-    echo "❌ .mcp.json is missing in current directory." >&2
-    echo "run this launcher from the repository you want Claude Code to work in." >&2
-    exit 1
-fi
-echo "✅ .mcp.json found"
+require_claude
+require_mcp_json
 
 remote_control_args=()
 if [[ -n "${TMUX_SESSION_NAME:-}" ]]; then
   remote_control_args=("--remote-control=$TMUX_SESSION_NAME")
 fi
 
+# Chrome integration is opt-in — token-heavy, only for real logged-in / visual work.
+chrome_args=()
+if [[ "${CLAUDE_CHROME:-0}" == "1" ]]; then
+  chrome_args=(--chrome)
+fi
+
+# Profile drives BOTH effort and model tier — tier is the biggest cost lever, so
+# "fast" drops from Opus to Sonnet. Only the native backend gets a tier drop.
 CLAUDE_PROFILE="${CLAUDE_PROFILE:-default}"
 case "$CLAUDE_PROFILE" in
   fast)
-    MAX_THINKING_TOKENS=4000
-    CLAUDE_CODE_MAX_OUTPUT_TOKENS=16384
-    CLAUDE_CODE_EFFORT_LEVEL="low"
+    CLAUDE_MODEL="sonnet"
+    EFFORT_LEVEL="low"
+    OUTPUT_TOKENS=16384
     ;;
   default)
-    MAX_THINKING_TOKENS=8000
-    CLAUDE_CODE_MAX_OUTPUT_TOKENS=32768
-    CLAUDE_CODE_EFFORT_LEVEL="medium"
+    CLAUDE_MODEL="opusplan"
+    EFFORT_LEVEL="medium"
+    OUTPUT_TOKENS=32768
     ;;
   deep)
-    MAX_THINKING_TOKENS=16000
-    CLAUDE_CODE_MAX_OUTPUT_TOKENS=32768
-    CLAUDE_CODE_EFFORT_LEVEL="high"
+    CLAUDE_MODEL="opus"
+    EFFORT_LEVEL="high"
+    OUTPUT_TOKENS=32768
     ;;
   *)
     echo "❌ Invalid CLAUDE_PROFILE: $CLAUDE_PROFILE (use fast, default, or deep)." >&2
     exit 1
     ;;
 esac
+echo "⚙️  Profile: $CLAUDE_PROFILE | model: $CLAUDE_MODEL | effort: $EFFORT_LEVEL | output: $OUTPUT_TOKENS | chrome: ${CLAUDE_CHROME:-0}"
 
-echo "⚙️  Profile: $CLAUDE_PROFILE | thinking: $MAX_THINKING_TOKENS | output: $CLAUDE_CODE_MAX_OUTPUT_TOKENS | effort: $CLAUDE_CODE_EFFORT_LEVEL"
+export_plumbing_env
+export CLAUDE_CODE_MAX_OUTPUT_TOKENS="$OUTPUT_TOKENS"
+# Cap MCP output so a single tool return can't blow the cached prefix. Kept
+# generous here — the cache absorbs most repeated context on this backend.
+export MAX_MCP_OUTPUT_TOKENS=25000
 
-export CLAUDE_PROJECT_DIR="$(pwd)"
-export CLAUDE_CODE_NO_FLICKER=1
-export MCP_CONNECTION_NONBLOCKING=true
-export MAX_THINKING_TOKENS
-export CLAUDE_CODE_MAX_OUTPUT_TOKENS
-export CLAUDE_CODE_EFFORT_LEVEL
-export BASH_MAX_OUTPUT_LENGTH=12000
-export BASH_DEFAULT_TIMEOUT_MS=180000
-
-claude \
+# Cache protection, native-only:
+#  - --exclude-dynamic-system-prompt-sections moves per-machine bits (cwd, env,
+#    git status) out of the cached prefix, improving cross-session cache reuse.
+#  - Autocompact is left at Claude's default ON PURPOSE. Forcing early compaction
+#    rewrites the prefix and burns the warm 1h cache, which costs more than it
+#    saves on this backend. Do NOT add CLAUDE_CODE_AUTO_COMPACT_WINDOW here.
+exec claude \
   --continue \
-  --chrome \
+  "${chrome_args[@]}" \
+  --exclude-dynamic-system-prompt-sections \
   --permission-mode=bypassPermissions \
-  --brief \
   --mcp-config ./.mcp.json \
+  --model "$CLAUDE_MODEL" \
+  --effort "$EFFORT_LEVEL" \
   --name="Anthropic Claude" \
   "${remote_control_args[@]}"
