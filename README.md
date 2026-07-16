@@ -272,12 +272,12 @@ In each running instance, use `/theme` and select its corresponding custom theme
 
 ## Optional: token and context efficiency
 
-These add-ons reduce avoidable context and output tokens, helping subscriptions last longer without reducing the work Claude Code performs:
+These add-ons trim the *cheap* layers — repeated file/shell reads and verbose output prose. Useful, but calibrate expectations: on native Anthropic the dominant cost lever is **prompt caching** (the large static prefix re-reads at roughly a tenth of input price), which the launchers already protect. Output prose and repeated reads are a small share of agentic-coding cost next to input context and thinking.
 
-- **[lean-ctx](https://github.com/yvgude/lean-ctx)** — a context runtime that compresses repeated file reads with AST-aware logic, strips noise from shell output, and manages cross-session memory.
-- **[caveman](https://github.com/JuliusBrussee/caveman)** — a Claude Code plugin that trims verbose model output. Reports suggest it can cut output tokens by roughly 65–75% by keeping replies short and direct.
+- **[caveman](https://github.com/JuliusBrussee/caveman)** — a Claude Code plugin that trims verbose model output (~65–75% fewer output tokens). Real but modest, and low-risk to code quality: it compresses human-facing prose only, leaving thinking, tool I/O, and code blocks untouched.
+- **[lean-ctx](https://github.com/yvgude/lean-ctx)** — a context runtime that compresses repeated file reads and shell output and manages cross-session memory. Note the overlap with prompt caching: on native Anthropic, caching already discounts repeated reads, so lean-ctx's marginal saving there is small (~3–4% in one measured setup) while adding a `ctx_*` tool layer. It is better matched to backends **without** prompt caching (e.g. a proxy routing to a non-Anthropic model).
 
-Neither is required to use the proxy. They are most useful in long-running sessions where repeated context reads and overly verbose responses would otherwise consume the subscription allowance.
+Neither is required. The largest runway levers are elsewhere: prompt caching (native), the right model tier for the task, and getting work right the first time so tokens are not spent redoing it.
 
 ## Optional: Claude Code developer experience with TweakCC
 
