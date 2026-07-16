@@ -21,6 +21,16 @@ require_mcp_json() {
   echo "✅ .mcp.json found"
 }
 
+get_context_name() {
+    # 1. Try tmux
+    if [ -n "${TMUX:-}" ]; then
+        tmux display-message -p '#S'
+    # 2. If not tmux, try git
+    elif git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+        basename "$(git rev-parse --show-toplevel)"
+    fi
+}
+
 # require_proxy <port> — LiteLLM-routed launchers only.
 require_proxy() {
   local port="$1"

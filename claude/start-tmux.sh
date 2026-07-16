@@ -17,6 +17,13 @@ if ! which lazygit &> /dev/null; then
 fi
 echo "✅ lazygit is installed."
 
+if ! which yazi &> /dev/null; then
+  echo "❌ yazi is not installed." >&2
+  echo "please install it and try again." >&2
+  exit 1
+fi
+echo "✅ yazi is installed."
+
 TMUX_SESSION_NAME="${1:-}"
 if [[ -z "$TMUX_SESSION_NAME" ]]; then
   echo "❌ please use a session name and try again." >&2
@@ -41,5 +48,6 @@ tmux send-keys -t "$TMUX_SESSION_NAME":1.1 "vim ~/scratch.$TMUX_SESSION_NAME.md"
 tmux send-keys -t "$TMUX_SESSION_NAME":1.2 "TMUX_SESSION_NAME=$(printf '%q' "$TMUX_SESSION_NAME") $(printf '%q' "$SCRIPT_DIR/select-claude-model.sh")" Enter
 
 tmux new-window -t "$TMUX_SESSION_NAME": -n lazygit "lazygit"
+tmux new-window -t "$TMUX_SESSION_NAME": -n yazi "yazi ."
 
 tmux attach-session -t "$TMUX_SESSION_NAME":1

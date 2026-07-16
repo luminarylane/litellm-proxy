@@ -19,11 +19,14 @@ source "$SCRIPT_DIR/_common.sh"
 require_claude
 require_mcp_json
 
+# Set the context var for use in remote
+CONTEXT_NAME=$(get_context_name)
 remote_control_args=()
-if [[ -n "${TMUX_SESSION_NAME:-}" ]]; then
-  remote_control_args=("--remote-control=$TMUX_SESSION_NAME")
+if [[ -n "$CONTEXT_NAME" ]]; then
+  remote_control_args=("--remote-control=$CONTEXT_NAME")
 fi
 
+# Chrome integration is opt-in — token-heavy, only for real logged-in / visual work.
 # Chrome integration is opt-in — token-heavy, only for real logged-in / visual work.
 chrome_args=()
 if [[ "${CLAUDE_CHROME:-0}" == "1" ]]; then
@@ -68,8 +71,16 @@ export MAX_MCP_OUTPUT_TOKENS=25000
 #  - Autocompact is left at Claude's default ON PURPOSE. Forcing early compaction
 #    rewrites the prefix and burns the warm 1h cache, which costs more than it
 #    saves on this backend. Do NOT add CLAUDE_CODE_AUTO_COMPACT_WINDOW here.
+# Session continuity: --continue by default; CLAUDE_FRESH=1 starts a clean
+# session (escape hatch for a cross-provider transcript that won't resume, e.g.
+# a leftover LiteLLM/GPT conversation that fails Anthropic thinking-block checks).
+continue_args=(--continue)
+if [[ "${CLAUDE_FRESH:-0}" == "1" ]]; then
+  continue_args=()
+fi
+
 exec claude \
-  --continue \
+  "${continue_args[@]}" \
   "${chrome_args[@]}" \
   --exclude-dynamic-system-prompt-sections \
   --permission-mode=bypassPermissions \
