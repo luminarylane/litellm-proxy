@@ -80,12 +80,12 @@ if [[ "${CLAUDE_FRESH:-0}" == "1" ]]; then
 fi
 
 exec claude \
-  "${continue_args[@]}" \
-  "${chrome_args[@]}" \
+  ${continue_args[@]+"${continue_args[@]}"} \
+  ${chrome_args[@]+"${chrome_args[@]}"} \
   --exclude-dynamic-system-prompt-sections \
   --permission-mode=bypassPermissions \
   --mcp-config ./.mcp.json \
   --model "$CLAUDE_MODEL" \
   --effort "$EFFORT_LEVEL" \
   --name="Anthropic Claude" \
-  "${remote_control_args[@]}"
+  ${remote_control_args[@]+"${remote_control_args[@]}"}
