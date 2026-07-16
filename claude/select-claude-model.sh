@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-# Work mode applies only to the native Claude launcher (the standalone agents
-# codex/agy and the direct GLM/Kimi launchers do not read CLAUDE_PROFILE).
+# Work mode applies only to the native Claude launcher (the direct GLM/Kimi
+# launchers do not read CLAUDE_PROFILE).
 choose_profile() {
   clear
   echo "╔══════════════════════════════════════════════════════════════╗"
@@ -38,19 +38,17 @@ echo "╚═══════════════════════�
 echo
 echo "  [1] Claude       1M  • Best subscription value; hardest work"
 echo "      Opus / Sonnet / Haiku family (native, caching works)"
-echo "  [2] GPT — Codex        • OpenAI's native agent; use your OpenAI credits"
-echo "  [3] Gemini — Antigravity • Google's native agent (agy CLI)"
-echo "  [4] Kimi Coding Plan    262k • Direct Kimi; not LiteLLM-metered"
-echo "  [5] Z.ai GLM-5.2  1M • Direct Z.ai; all Claude tiers map to GLM-5.2"
-echo "  [6] Z.ai GLM-4.7  200k • Direct Z.ai; all Claude tiers map to GLM-4.7"
+echo "  [2] Kimi Coding Plan    262k • Direct Kimi; not LiteLLM-metered"
+echo "  [3] Z.ai GLM-5.2  1M • Direct Z.ai; all Claude tiers map to GLM-5.2"
+echo "  [4] Z.ai GLM-4.7  200k • Direct Z.ai; all Claude tiers map to GLM-4.7"
 echo
-echo "  GPT and Gemini run in their OWN agents (Codex / Antigravity), NOT through"
-echo "  the LiteLLM bridge — routing them via Claude Code was measured to burn"
-echo "  tokens with no prompt caching. Right tool, right job."
+echo "  For GPT use OpenAI Codex (run: codex) and for Gemini use Google"
+echo "  Antigravity (run: agy) directly — their own native agents, not routed"
+echo "  through Claude Code."
 echo
 echo "  [q] Quit"
 echo
-read -r -p "Choose model [1-6]: " choice
+read -r -p "Choose model [1-4]: " choice
 
 case "$choice" in
   1)
@@ -60,22 +58,14 @@ case "$choice" in
     CLAUDE_PROFILE="$CLAUDE_PROFILE" "$SCRIPT_DIR/start-claude-claude.sh"
     ;;
   2)
-    echo "▶ Starting OpenAI Codex..."
-    exec codex
-    ;;
-  3)
-    echo "▶ Starting Google Antigravity (agy)..."
-    exec agy
-    ;;
-  4)
     echo "▶ Starting Kimi Coding Plan (direct)..."
     exec "$SCRIPT_DIR/start-claude-kimi.sh"
     ;;
-  5)
+  3)
     echo "▶ Starting Z.ai GLM-5.2 (direct)..."
     exec "$SCRIPT_DIR/start-claude-glm-5-2.sh"
     ;;
-  6)
+  4)
     echo "▶ Starting Z.ai GLM-4.7 (direct, short 200k-context sessions)..."
     exec "$SCRIPT_DIR/start-claude-glm-4-7.sh"
     ;;
@@ -83,7 +73,7 @@ case "$choice" in
     exit 0
     ;;
   *)
-    echo "❌ Invalid model. Choose 1-6, or q to quit." >&2
+    echo "❌ Invalid model. Choose 1-4, or q to quit." >&2
     exit 1
     ;;
 esac
